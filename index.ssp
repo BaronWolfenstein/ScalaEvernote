@@ -150,9 +150,9 @@ if (action != null) {
 	  
           for(notebook <- notebooks)
           {
-		println("Notebook: " + (notebook).getName());		
+		println("Notebook: " + (notebook.asInstanceOf[Notebook]).getName());		
 		nf.clear();		
-		nf.setNotebookGuid(notebook.getGuid());
+		nf.setNotebookGuid((notebook.asInstanceOf[Notebook]).getGuid());
 		ncc = NoteStore.findNoteCounts(accessToken, nf, false);
 		notelist = NoteStore.findNotes(accessToken, nf, 0, ncc.getNotebookCountsSize());
 		for (note <- notelist)
