@@ -157,8 +157,8 @@ if (action != null) {
 		notelist = NoteStore.findNotes(accessToken, nf, 0, ncc.getNotebookCountsSize());
 		for (note <- notelist)
 		{
-			note = NoteStore.getNote(accessToken, note.getGuid(), true, false, false, false);
-			println("Note" + note.getGuid() + ": " + note.getContent());
+			note = NoteStore.getNote(accessToken, (note.asInstanceOf[Note]).getGuid(), true, false, false, false);
+			println("Note" + (note.asInstanceOf[Note]).getGuid() + ": " + (note.asInstanceOf[Note]).getContent());
 		}
 	  }
           //notebooks.foreach(notebook => println("Notebook: " + (notebook.asInstanceOf[Notebook]).getName())); 
