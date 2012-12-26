@@ -101,7 +101,7 @@ if (action != null) {
           System.err.println("Resetting");
           // Empty the server's stored session information for the current
           // browser user so we can redo the test.
-          for (Iterator<_> names = session.getAttributeNames();
+          for (Iterator[_] names = session.getAttributeNames();
                names.hasMoreElements(); ) {
             session.removeAttribute(names.nextElement().asInstanceOf[String]);
           }
