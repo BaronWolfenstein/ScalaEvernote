@@ -22,8 +22,8 @@
 #import(java.util.*)
 <% import='java.net.*' %>
 <% import='org.apache.thrift.*' %>
-<% import='org.apache.thrift.protocol.TBinaryProtocol' %>
-<% import='org.apache.thrift.transport.THttpClient' %>
+<% import='com.evernote.thrift.protocol.TBinaryProtocol' %>
+<% import='com.evernote.thrift.transport.THttpClient' %>
 <% import='com.evernote.edam.type.*' %>
 <% import='com.evernote.edam.notestore.*' %>
 <% import='com.evernote.client.oauth.*' %>
