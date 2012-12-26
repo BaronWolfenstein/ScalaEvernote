@@ -142,9 +142,11 @@ if (action != null) {
           var noteStoreTrans = new THttpClient(noteStoreUrl);
           var noteStoreProt = new TBinaryProtocol(noteStoreTrans);
           var noteStore = new NoteStore.Client(noteStoreProt, noteStoreProt);
-    var notebooks:Buffer[_] = noteStore.listNotebooks(accessToken); //or use .toList.foreach and keep List[?]
+          var notebooks:Buffer[_] = noteStore.listNotebooks(accessToken); //or use .toList.foreach and keep List[?]
 	  var nf = new NoteFilter();
 	  var ncc = new NoteCollectionCounts();
+          var nl = new NoteList();
+          var notelist:Buffer[_] = nl.getNotes();
 	  //nf.clear();
           
 	  
@@ -154,7 +156,8 @@ if (action != null) {
 		nf.clear();		
 		nf.setNotebookGuid((notebook.asInstanceOf[Notebook]).getGuid());
 		ncc = NoteStore.findNoteCounts(accessToken, nf, false);
-		notelist = NoteStore.findNotes(accessToken, nf, 0, ncc.getNotebookCountsSize());
+		nl = NoteStore.findNotes(accessToken, nf, 0, ncc.getNotebookCountsSize());
+		notelist = nl.getNotes();
 		for (note <- notelist)
 		{
 			note = NoteStore.getNote(accessToken, (note.asInstanceOf[Note]).getGuid(), true, false, false, false);
