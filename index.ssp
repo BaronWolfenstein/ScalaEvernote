@@ -1,0 +1,246 @@
+<%--
+
+  Demonstrates the use of OAuth to authenticate to the Evernote API in
+  four steps:
+  
+  1. Obtain an OAuth request token from the Evernote service.
+  2. Redirect the user to Evernote.com to authorize access to their account.
+  3. Upon receiving a successful redirect back from Evernote.com, exchange
+     the OAuth request token for an OAuth access token.
+  4. Use the OAuth access token to access the Evernote API, in this case
+     listing the notebooks in the user's Evernote account.
+  
+  In this sample, we use the Scribe library to perform the actual OAuth
+  requests. You don't have to use Scribe; any OAuth consumer library should work.
+  Read about Scribe at https://github.com/fernandezpablo85/scribe-java
+
+  Learn more at http://dev.evernote.com/documentation/cloud/chapters/Authentication.php
+  
+  Copyright 2008-2012 Evernote Corporation. All rights reserved.
+
+--%>
+#import(java.util.*)
+<% import='java.net.*' %>
+<% import='org.apache.thrift.*' %>
+<% import='org.apache.thrift.protocol.TBinaryProtocol' %>
+<% import='org.apache.thrift.transport.THttpClient' %>
+<% import='com.evernote.edam.type.*' %>
+<% import='com.evernote.edam.notestore.*' %>
+<% import='com.evernote.client.oauth.*' %>
+<% import='org.scribe.builder.ServiceBuilder' %>
+<% import='org.scribe.oauth.*' %>
+<% import='org.scribe.model.*' %>
+<% import scala.collection.JavaConversions._ %>
+<% import scala.collection.mutable._ %>
+<%!
+
+  /*
+* Fill in your Evernote API key. To get an API key, go to
+* http://dev.evernote.com/documentation/cloud/
+*/
+  //would normally be in Scala object
+
+  val consumerKey:String = "selimthegrim";
+  val consumerSecret:String = "eba27a8ab783497c";
+  
+  /*
+* Replace this value with https://www.evernote.com to switch from the Evernote
+* sandbox server to the Evernote production server.
+*/
+  val urlBase:String = "https://sandbox.evernote.com";
+  
+  val requestTokenUrl:String = urlBase + "/oauth";
+  val accessTokenUrl:String = urlBase + "/oauth";
+  val authorizationUrlBase:String = urlBase + "/OAuth.action";
+ 
+  val callbackUrl:String = "index1.ssp?action=callbackReturn";
+%>
+<%
+  var accessToken:String = session.getAttribute("accessToken");
+  var requestToken:String = session.getAttribute("requestToken");
+  var requestTokenSecret:String = session.getAttribute("requestTokenSecret");
+  var verifier:String = session.getAttribute("verifier");
+
+  var action:String = request.getParameter("action");
+
+  if ("".equals(consumerKey)) {
+%>
+    <span style="color:red">
+     Before using this sample code you must edit the file index.jsp
+      and replace consumerKey and consumerSecret with the values that you received from Evernote.
+      If you do not have an API key, you can request one from
+      <a href="http://dev.evernote.com/documentation/cloud/">http://dev.evernote.com/documentation/cloud/</a>
+    </span>
+<%
+  } else {
+if (action != null) {
+%>
+
+    <hr/>
+    <h3>Action results:</h3>
+    <pre><%
+    
+      // Set up the Scribe OAuthService. To access the Evernote production service,
+      // remove EvernoteSandboxApi from the provider class below.
+      thisUrl:String = request.getRequestURL().toString();
+      cbUrl:String = thisUrl.substring(0, thisUrl.lastIndexOf('/') + 1) + callbackUrl;
+    
+      providerClass:Class[_] = org.scribe.builder.api.EvernoteApi.Sandbox.getClass; //type Class
+      if (urlBase.equals("https://www.evernote.com")) {
+        providerClass = org.scribe.builder.api.EvernoteApi.getClass;
+      }
+      def service = new ServiceBuilder()
+          service.provider(providerClass)
+          service.apiKey(consumerKey)
+          service.apiSecret(consumerSecret)
+          service.callback(cbUrl)
+          service.build();
+
+      try {
+        if ("reset".equals(action)) {
+          System.err.println("Resetting");
+          // Empty the server's stored session information for the current
+          // browser user so we can redo the test.
+          for (Iterator<_> names = session.getAttributeNames();
+               names.hasMoreElements(); ) {
+            session.removeAttribute(names.nextElement().asInstanceOf[String]);
+          }
+          accessToken = null;
+          requestToken = null;
+          verifier = null;
+          out.println("Removed all attributes from user session");
+
+        } else if ("getRequestToken".equals(action)) {
+          // Send an OAuth message to the Provider asking for a new Request
+          // Token because we don't have access to the current user's account.
+          var scribeRequestToken = service.getRequestToken();
+
+          out.println("<br/><b>Reply:</b> <br/> <span style=\"word-wrap: break-word\">" + scribeRequestToken.getRawResponse() + "</span>");
+          requestToken = scribeRequestToken.getToken();
+          session.setAttribute("requestToken", requestToken);
+          session.setAttribute("requestTokenSecret", scribeRequestToken.getSecret());
+
+        } else if ("getAccessToken".equals(action)) {
+          // Send an OAuth message to the Provider asking to exchange the
+          // existing Request Token for an Access Token
+          var scribeRequestToken = new Token(requestToken, requestTokenSecret);
+          var scribeVerifier = new Verifier(verifier);
+          var token = new EvernoteAuthToken(service.getAccessToken(scribeRequestToken, scribeVerifier));
+          out.println("<br/><b>Reply:</b> <br/> <span style=\"word-wrap: break-word\">" + token.getRawResponse() + "</span>");
+          accessToken = token.getToken();
+          var noteStoreUrl:String = token.getNoteStoreUrl();
+          session.setAttribute("accessToken", accessToken);
+          session.setAttribute("noteStoreUrl", noteStoreUrl);
+         
+        } else if ("callbackReturn".equals(action)) {
+          requestToken = request.getParameter("oauth_token");
+          verifier = request.getParameter("oauth_verifier");
+          session.setAttribute("verifier", verifier);
+        } else if ("listNotes".equals(action)) {
+          noteStoreUrl:String = (session.getAttribute("noteStoreUrl")).asInstanceOf[String];
+          //out.println("Listing notebooks from: " + noteStoreUrl);
+          var noteStoreTrans = new THttpClient(noteStoreUrl);
+          var noteStoreProt = new TBinaryProtocol(noteStoreTrans);
+          var noteStore = new NoteStore.Client(noteStoreProt, noteStoreProt);
+    var notebooks:Buffer[_] = noteStore.listNotebooks(accessToken); //or use .toList.foreach and keep List[?]
+	  var nf = new NoteFilter();
+	  var ncc = new NoteCollectionCounts();
+	  //nf.clear();
+          
+	  
+          for(notebook <- notebooks)
+          {
+		println("Notebook: " + (notebook).getName());		
+		nf.clear();		
+		nf.setNotebookGuid(notebook.getGuid());
+		ncc = NoteStore.findNoteCounts(accessToken, nf, false);
+		notelist = NoteStore.findNotes(accessToken, nf, 0, ncc.getNotebookCountsSize());
+		for (note <- notelist)
+		{
+			note = NoteStore.getNote(accessToken, note.getGuid(), true, false, false, false);
+			println("Note" + note.getGuid() + ": " + note.getContent());
+		}
+	  }
+          //notebooks.foreach(notebook => println("Notebook: " + (notebook.asInstanceOf[Notebook]).getName())); 
+          //maybe typecast not necessary
+          }
+          
+        }
+      } catch {
+        case e: Exception => println(e.toString());
+        //e.printStackTrace();
+        
+      }
+  
+    %></pre>
+    <hr/>
+<% } %>
+
+<!-- Information used by consumer -->
+<h3>Evernote EDAM API Web Test State</h3>
+Consumer key: <%= consumerKey %><br/>
+Request token URL: <%= requestTokenUrl %><br/>
+Access token URL: <%= accessTokenUrl %><br/>
+Authorization URL Base: <%= authorizationUrlBase %><br/>
+<br/>
+User request token: <%= session.getAttribute("requestToken") %><br/>
+User request token secret: <%= session.getAttribute("requestTokenSecret") %><br/>
+User oauth verifier: <%= session.getAttribute("verifier") %><br/>
+User access token: <%= session.getAttribute("accessToken") %><br/>
+User NoteStore URL: <%= session.getAttribute("noteStoreUrl") %>
+
+
+<!-- Manual operation controls -->
+<hr/>
+<h3>Actions</h3>
+
+<ol>
+
+<!-- Step 1 in OAuth authorization: obtain an unauthorized request token from the provider -->
+<li>
+<% if (requestToken == null && accessToken == null) { %>
+  <a href='?action=getRequestToken'>Get OAuth Request Token from Provider</a>
+<% } else { %>
+Get OAuth Request Token from Provider
+<% } %>
+</li>
+
+<!-- Step 2 in OAuth authorization: redirect the user to the provider to authorize the request token -->
+<li>
+<%
+if (requestToken != null && verifier == null && accessToken == null) {
+authorizationUrl:String = authorizationUrlBase + "?oauth_token=" + requestToken;
+%>
+    <a href='<%= authorizationUrl %>'>Send user to get authorization</a>
+<%
+} else {
+%>
+Send user to get authorization
+<% } %>
+</li>
+
+<!-- Step 3 in OAuth authorization: exchange the authorized request token for an access token -->
+<li>
+<% if (requestToken != null && verifier != null && accessToken == null) { %>
+    <a href="?action=getAccessToken">
+      Get OAuth Access Token from Provider
+    </a>
+<% } else { %>
+      Get OAuth Access Token from Provider
+<% } %>
+</li>
+
+<!-- Step 4 in OAuth authorization: use the access token that you obtained -->
+<!-- In this sample, we simply list the notes in the user's Evernote account -->
+<li>
+<% if (accessToken != null) { %>
+  <a href="?action=listNotes">List notes in account</a><br/>
+<% } else { %>
+List notes in account
+<% } %>
+</li>
+</ol>
+
+<a href="?action=reset">Reset user session</a>
+
+<% } %>
